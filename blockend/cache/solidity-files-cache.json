@@ -1099,8 +1099,8 @@
       ]
     },
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\contracts\\governance\\GovernorContract.sol": {
-      "lastModificationDate": 1674380217228,
-      "contentHash": "1bf7b865f76f7680affb23f179c0c779",
+      "lastModificationDate": 1674968226581,
+      "contentHash": "6f01214525da514971b41d10feab6440",
       "sourceName": "contracts/governance/GovernorContract.sol",
       "solcConfig": {
         "version": "0.8.9",

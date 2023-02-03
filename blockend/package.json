@@ -16,6 +16,8 @@
     "solidity-coverage": "^0.8.2"
   },
   "dependencies": {
+    "@glif/filecoin-address": "^2.0.18",
+    "@zondax/filecoin-solidity": "^0.4.0-beta.1",
     "fs": "^0.0.1-security"
   }
 }
