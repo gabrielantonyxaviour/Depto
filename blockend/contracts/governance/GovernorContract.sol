@@ -17,6 +17,7 @@ contract GovernorContract is
         string name;
         address walletAddress;
         uint joinedAt;
+        uint leftAt;
     }
 
     struct Application {
@@ -33,8 +34,10 @@ contract GovernorContract is
         uint claimedOn;
     }
 
-    DAOMember[] public daoMembers;
-    uint public daoMemberPointer;
+    uint public treasury;
+
+    mapping(address => DAOMember) public daoMembers;
+    uint public daoMemberCount;
 
     mapping(uint => Application) applications;
     uint public applicationsPointer;
@@ -57,10 +60,12 @@ contract GovernorContract is
     uint256 public constant FALSE_CLAIM_FEE = 1000000000000000000;
 
     constructor(
+        string memory deployerName,
         TimelockController _timelock,
         uint256 _votingPeriod,
         uint256 _votingDelay
     )
+        payable
         Governor("GovernorContract")
         GovernorSettings(
             _votingDelay, /* 1 block */ // voting delay
@@ -69,8 +74,16 @@ contract GovernorContract is
         )
         GovernorTimelockControl(_timelock)
     {
-        daoMemberPointer = 0;
         timelock = _timelock;
+        treasury += msg.value;
+        daoMembers[msg.sender] = DAOMember(
+            deployerName,
+            msg.sender,
+            block.timestamp,
+            0
+        );
+        daoMemberCount = 1;
+        isDAOMember[msg.sender] = true;
     }
 
     modifier checkDAOMember(address caller) {
@@ -115,12 +128,8 @@ contract GovernorContract is
             msg.sender == address(timelock),
             "TimeLock can only invoke this function"
         );
-        daoMembers[daoMemberPointer] = DAOMember(
-            name,
-            newMember,
-            block.timestamp
-        );
-        daoMemberPointer += 1;
+        daoMembers[msg.sender] = DAOMember(name, newMember, block.timestamp, 0);
+        daoMemberCount += 1;
         isDAOMember[newMember] = true;
     }
 
@@ -129,7 +138,7 @@ contract GovernorContract is
             msg.value >= PROPOSAL_FEE,
             "Insufficient Fee to apply for a patent"
         );
-        // TODO: Remaining money handling
+        treasury += msg.value - PROPOSAL_FEE;
         applications[applicationsPointer] = Application(
             msg.sender,
             metadataURI,
@@ -149,6 +158,8 @@ contract GovernorContract is
             msg.value >= FALSE_CLAIM_FEE,
             "Insufficient Funds for False Claim"
         );
+        treasury += msg.value - FALSE_CLAIM_FEE;
+
         falseClaims[falseClaimPointer] = FalseClaim(
             msg.sender,
             applierPatentTokenId,
@@ -165,8 +176,18 @@ contract GovernorContract is
         uint26[] memory values,
         bytes[] memory calldatas,
         string memory description
-    ) public {
+    ) public checkDAOMember(msg.sender) {
         super.propose(targets, values, calldatas, description);
+    }
+
+    function leaveDAO() public checkDAOMember(msg.sender) {
+        isDAOMember[msg.sender] = false;
+        daoMembers[msg.sender].leftAt = block.timestamp;
+        uint funds = treasury / daoMemberCount;
+        daoMemberCount -= 1;
+        (bool success, bytes memory data) = payable(msg.sender).call{
+            value: funds
+        }("");
     }
 
     function proposalThreshold()
