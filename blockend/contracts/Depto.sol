@@ -99,7 +99,7 @@ contract Depto is ERC721URIStorage, Ownable {
         uint size,
         address verifier,
         address patentClaimer
-    ) public payable returns (bool) {
+    ) public payable onlyOwner returns (bool) {
         require(msg.value >= PROPOSAL_FEE, "Invalid");
         patents[cidraw] = PatentStorageDeal(
             cidraw,
@@ -118,7 +118,7 @@ contract Depto is ERC721URIStorage, Ownable {
         uint appliedTokenId,
         address claimerAddress,
         address falseClaimVerifier
-    ) public payable {
+    ) public payable onlyOwner {
         require(
             msg.value >= FALSE_CLAIM_FEE,
             "Not enough fees to resolve claim"
