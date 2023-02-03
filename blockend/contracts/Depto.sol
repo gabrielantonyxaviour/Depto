@@ -47,6 +47,8 @@ contract Depto is ERC721URIStorage, Ownable {
     uint256 public constant SP_FEE = 645161290320000000;
     uint256 public constant GOVERNMENT_FEE = 667741935480000000;
     uint256 public constant CREATOR_FEE = 300000000000000000;
+    uint256 public constant PROPOSAL_FEE = 2000000000000000000;
+    uint256 public constant FALSE_CLAIM_FEE = 1000000000000000000;
 
     address public constant GOVERNMENT_ADDRESS =
         0x5353448037eb0d940f209d47f31DbdDd66237A90;
@@ -75,40 +77,57 @@ contract Depto is ERC721URIStorage, Ownable {
                 msg.sender == DEPTO_CREATOR_ADDRESS,
             "Not authorized to claim rewards"
         );
-        uint reward;
+        uint reward = 0;
         bool success;
         bytes memory data;
         if (governorContract.isDAOMember(msg.sender)) {
             if (currentApprovedPatentCount - validationClaim[msg.sender] > 0) {
-                reward =
+                reward +=
                     VALIDATOR_FEE *
                     (currentApprovedPatentCount - validationClaim[msg.sender]);
                 validationClaim[msg.sender] = currentApprovedPatentCount;
-                (success, data) = payable(msg.sender).call{value: reward}("");
             }
         }
-        reward = rewards[msg.sender];
+        reward += rewards[msg.sender];
         rewards[msg.sender] = 0;
+        require(reward > 0, "No rewards to claim");
         (success, data) = payable(msg.sender).call{value: reward}("");
     }
 
     function addCID(
         bytes calldata cidraw,
         uint size,
-        address proposer,
+        address verifier,
         address patentClaimer
     ) public payable returns (bool) {
-        require(msg.value >= 2000000000000000000, "Invalid");
+        require(msg.value >= PROPOSAL_FEE, "Invalid");
         patents[cidraw] = PatentStorageDeal(
             cidraw,
             size,
-            proposer,
+            verifier,
             patentClaimer,
             false,
             0
         );
 
         return true;
+    }
+
+    function falseClaimResolver(
+        uint falseTokenId,
+        uint appliedTokenId,
+        address claimerAddress,
+        address falseClaimVerifier
+    ) public payable {
+        require(
+            msg.value >= FALSE_CLAIM_FEE,
+            "Not enough fees to resolve claim"
+        );
+        _requireMinted(falseTokenId);
+        _burn(falseTokenId);
+        rewards[GOVERNMENT_ADDRESS] = msg.value / 2;
+        rewards[DEPTO_CREATOR_ADDRESS] = msg.value / 4;
+        rewards[falseClaimVerifier] = msg.value / 4;
     }
 
     function policyOK(bytes memory cidraw, uint64 provider)

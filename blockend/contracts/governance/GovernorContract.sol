@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
+import "../Depto.sol";
 
 contract GovernorContract is
     Governor,
@@ -19,14 +20,12 @@ contract GovernorContract is
     }
 
     struct Application {
-        string name;
         address walletAddress;
-        string metadataURI;
+        string metadata;
         uint appliedOn;
     }
 
     struct FalseClaim {
-        string name;
         address claimerWalletAddress;
         uint applierTokenId;
         uint falsePatentTokenId;
@@ -36,13 +35,23 @@ contract GovernorContract is
 
     DAOMember[] public daoMembers;
     uint public daoMemberPointer;
+
     mapping(uint => Application) applications;
     uint public applicationsPointer;
+    mapping(uint => bool) isApplicationHandled;
+
     mapping(uint => FalseClaim) falseClaims;
     uint public falseClaimPointer;
+    mapping(uint => bool) isFalseClaimHandled;
+
+    mapping(address => uint[]) daoMemberToApplications;
+    mapping(address => uint[]) daoMemberToFalseClaims;
     mapping(address => bool) public isDAOMember;
 
+    TimelockController timelock;
+
     mapping(address => uint256[]) public userToPatentClaims;
+    mapping(address => uint256[]) public userToFalseClaims;
 
     uint256 public constant PROPOSAL_FEE = 2000000000000000000;
     uint256 public constant FALSE_CLAIM_FEE = 1000000000000000000;
@@ -61,6 +70,7 @@ contract GovernorContract is
         GovernorTimelockControl(_timelock)
     {
         daoMemberPointer = 0;
+        timelock = _timelock;
     }
 
     modifier checkDAOMember(address caller) {
@@ -100,23 +110,37 @@ contract GovernorContract is
         return super.state(proposalId);
     }
 
-    function applyPatent(string name, string metadataURI) public payable {
+    function addDAOMember(address newMember, string memory name) public {
+        require(
+            msg.sender == address(timelock),
+            "TimeLock can only invoke this function"
+        );
+        daoMembers[daoMemberPointer] = DAOMember(
+            name,
+            newMember,
+            block.timestamp
+        );
+        daoMemberPointer += 1;
+        isDAOMember[newMember] = true;
+    }
+
+    function applyPatent(string metadataURI) public payable {
         require(
             msg.value >= PROPOSAL_FEE,
             "Insufficient Fee to apply for a patent"
         );
         // TODO: Remaining money handling
         applications[applicationsPointer] = Application(
-            name,
             msg.sender,
             metadataURI,
             block.timestamp
         );
+        userToPatentClaims[msg.sender].push(applicationsPointer);
+
         applicationsPointer += 1;
     }
 
     function applyFalseClaim(
-        string name,
         uint applierPatentTokenId,
         uint falsePatentTokenId,
         string metadataURI
@@ -126,59 +150,24 @@ contract GovernorContract is
             "Insufficient Funds for False Claim"
         );
         falseClaims[falseClaimPointer] = FalseClaim(
-            name,
             msg.sender,
             applierPatentTokenId,
             falsePatentTokenId,
             metadataURI,
             block.timestamp
         );
+        userToFalseClaims[msg.sender].push(falseClaimPointer);
         falseClaimPointer += 1;
-    }
-
-    function proposePatent(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) public checkDAOMember(msg.sender) {
-        require(values[0] >= PROPOSAL_FEE, "Insufficient FEE to propose");
-        require(checkDAOMember(targets[1]), "Proposal format invalid");
-        super.propose(addresses, values, calldatas, description);
-    }
-
-    function proposeMember(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) public checkDAOMember(msg.sender) {
-        require(
-            daoMemberPointer < 40,
-            "Cannot add any more members in the DAO"
-        );
-        super.propose(addresses, values, calldatas, description);
-    }
-
-    function proposeFalseClaim(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) public checkDAOMember(msg.sender) {
-        require(
-            daoMemberPointer < 40,
-            "Cannot add any more members in the DAO"
-        );
-        super.propose(addresses, values, calldatas, description);
     }
 
     function propose(
         address[] memory targets,
-        uint256[] memory values,
+        uint26[] memory values,
         bytes[] memory calldatas,
         string memory description
-    ) public override(Governor, IGovernor) returns (uint256) {}
+    ) public {
+        super.propose(targets, values, calldatas, description);
+    }
 
     function proposalThreshold()
         public
