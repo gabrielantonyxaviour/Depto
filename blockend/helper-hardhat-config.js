@@ -4,6 +4,9 @@ const networkConfig = {
   goerli: {
     blockConfirmations: 6,
   },
+  hyperspace: {
+    blockConfirmations: 6,
+  },
 };
 
 const developmentChains = ["hardhat", "localhost"];
