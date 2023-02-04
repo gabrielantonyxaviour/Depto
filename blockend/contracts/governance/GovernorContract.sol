@@ -34,10 +34,28 @@ contract GovernorContract is
         uint claimedOn;
     }
 
-    uint public treasury;
+    struct Votes {
+        uint againstVotes;
+        uint forVotes;
+        uint abstainVotes;
+    }
 
-    mapping(address => DAOMember) public daoMembers;
+    struct Proposal {
+        uint proposalId;
+        string description;
+        ProposalState state;
+        Votes votes;
+    }
+
+    uint public treasury;
+    uint public quorumPercentage;
+
+    DAOMember[] daoMembers;
+    mapping(address => uint) public addressToDaoMembers;
     uint public daoMemberCount;
+
+    uint[] public allProposals;
+    string[] public proposalsDescription;
 
     mapping(uint => Application) applications;
     uint public applicationsPointer;
@@ -51,7 +69,7 @@ contract GovernorContract is
     mapping(address => uint[]) daoMemberToFalseClaims;
     mapping(address => bool) public isDAOMember;
 
-    TimelockController timelock;
+    TimelockController timelockController;
 
     mapping(address => uint256[]) public userToPatentClaims;
     mapping(address => uint256[]) public userToFalseClaims;
@@ -63,7 +81,8 @@ contract GovernorContract is
         string memory deployerName,
         TimelockController _timelock,
         uint256 _votingPeriod,
-        uint256 _votingDelay
+        uint256 _votingDelay,
+        uint256 _quorumPercentage
     )
         payable
         Governor("GovernorContract")
@@ -74,13 +93,12 @@ contract GovernorContract is
         )
         GovernorTimelockControl(_timelock)
     {
-        timelock = _timelock;
+        timelockController = _timelock;
+        quorumPercentage = _quorumPercentage;
         treasury += msg.value;
-        daoMembers[msg.sender] = DAOMember(
-            deployerName,
-            msg.sender,
-            block.timestamp,
-            0
+        addressToDaoMembers[msg.sender] = daoMembers.length;
+        daoMembers.push(
+            DAOMember(deployerName, msg.sender, block.timestamp, 0)
         );
         daoMemberCount = 1;
         isDAOMember[msg.sender] = true;
@@ -112,6 +130,10 @@ contract GovernorContract is
         return super.votingPeriod();
     }
 
+    function quorum() public view override(IGovernor) returns (uint256) {
+        return (quorumPercentage * daoMemberCount) / 100;
+    }
+
     // The following functions are overrides required by Solidity.
 
     function state(uint256 proposalId)
@@ -125,15 +147,16 @@ contract GovernorContract is
 
     function addDAOMember(address newMember, string memory name) public {
         require(
-            msg.sender == address(timelock),
+            msg.sender == address(timelockController),
             "TimeLock can only invoke this function"
         );
-        daoMembers[msg.sender] = DAOMember(name, newMember, block.timestamp, 0);
+        addressToDaoMembers[msg.sender] = daoMembers.length;
+        daoMembers.push(DAOMember(name, newMember, block.timestamp, 0));
         daoMemberCount += 1;
         isDAOMember[newMember] = true;
     }
 
-    function applyPatent(string metadataURI) public payable {
+    function applyPatent(string memory metadataURI) public payable {
         require(
             msg.value >= PROPOSAL_FEE,
             "Insufficient Fee to apply for a patent"
@@ -152,7 +175,7 @@ contract GovernorContract is
     function applyFalseClaim(
         uint applierPatentTokenId,
         uint falsePatentTokenId,
-        string metadataURI
+        string memory metadataURI
     ) public payable {
         require(
             msg.value >= FALSE_CLAIM_FEE,
@@ -173,16 +196,29 @@ contract GovernorContract is
 
     function propose(
         address[] memory targets,
-        uint26[] memory values,
+        uint256[] memory values,
         bytes[] memory calldatas,
         string memory description
-    ) public checkDAOMember(msg.sender) {
-        super.propose(targets, values, calldatas, description);
+    )
+        public
+        override(Governor, IGovernor)
+        checkDAOMember(msg.sender)
+        returns (uint256)
+    {
+        uint proposalId = super.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+        allProposals.push(proposalId);
+        proposalsDescription.push(description);
     }
 
     function leaveDAO() public checkDAOMember(msg.sender) {
         isDAOMember[msg.sender] = false;
-        daoMembers[msg.sender].leftAt = block.timestamp;
+        daoMembers[addressToDaoMembers[msg.sender]].leftAt = block.timestamp;
+
         uint funds = treasury / daoMemberCount;
         daoMemberCount -= 1;
         (bool success, bytes memory data) = payable(msg.sender).call{
@@ -236,11 +272,67 @@ contract GovernorContract is
         return super.supportsInterface(interfaceId);
     }
 
+    function getAllDaoMembers()
+        public
+        view
+        returns (DAOMember[] memory _daoMembers)
+    {
+        uint j = 0;
+        for (uint256 i = 0; i < daoMembers.length; i++) {
+            if (daoMembers[i].leftAt == 0) {
+                _daoMembers[j] = daoMembers[i];
+                j += 1;
+            }
+        }
+    }
+
     function getPatentClaims(address user)
         public
         view
-        returns (uint256[] memory)
+        returns (Application[] memory _applications)
     {
-        return userToPatentClaims[user];
+        uint j = 0;
+        for (uint i = 0; i < applicationsPointer; i++) {
+            if (isApplicationHandled[i] == false) {
+                _applications[j] = applications[i];
+                j += 1;
+            }
+        }
+    }
+
+    function getFalseClaims(address user)
+        public
+        view
+        returns (FalseClaim[] memory _falseClaims)
+    {
+        uint j = 0;
+
+        for (uint i = 0; i < falseClaimPointer; i++) {
+            if (isFalseClaimHandled[i] == false) {
+                _falseClaims[j] = falseClaims[i];
+                j += 1;
+            }
+        }
+    }
+
+    function getAllProposals()
+        public
+        view
+        returns (Proposal[] memory _proposals)
+    {
+        for (uint i = 0; i < allProposals.length; i++) {
+            uint _proposal = allProposals[i];
+            (
+                uint _againstVotes,
+                uint _forVotes,
+                uint _abstainVotes
+            ) = proposalVotes(allProposals[i]);
+            _proposals[i] = Proposal(
+                _proposal,
+                proposalsDescription[i],
+                state(_proposal),
+                Votes(_againstVotes, _forVotes, _abstainVotes)
+            );
+        }
     }
 }

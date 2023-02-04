@@ -169,8 +169,8 @@ contract Depto is ERC721URIStorage, Ownable {
         // get dealer (bounty hunter client)
         MarketTypes.GetDealClientReturn memory clientRet = MarketAPI
             .getDealClient(deal_id);
-        patents[cidraw].set = true;
-        patents[cidraw].mintedAt = block.timestamp;
+        patents[commitmentRet.data].set = true;
+        patents[commitmentRet.data].mintedAt = block.timestamp;
         // send reward to client
         send(clientRet.client);
 
@@ -224,5 +224,15 @@ contract Depto is ERC721URIStorage, Ownable {
             emptyParams,
             actorID
         );
+    }
+
+    function getAllPatents()
+        public
+        view
+        returns (PatentStorageDeal[] memory _patents)
+    {
+        for (int i = 0; i < currentTokenId; i++) {
+            _patents.push(patents[bytes(tokenURI(i))]);
+        }
     }
 }
