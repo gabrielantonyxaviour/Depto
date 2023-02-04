@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\contracts\\Depto.sol": {
-      "lastModificationDate": 1674380017164,
-      "contentHash": "c96827d4f962d9e474cb3c6e77ac2653",
+      "lastModificationDate": 1675484432285,
+      "contentHash": "9e4dabb6f89f52cff86617f347350d77",
       "sourceName": "contracts/Depto.sol",
       "solcConfig": {
         "version": "0.8.9",
@@ -36,7 +36,14 @@
         }
       },
       "imports": [
-        "@openzeppelin/contracts/access/Ownable.sol"
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol",
+        "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol",
+        "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol",
+        "@zondax/filecoin-solidity/contracts/v0.8/utils/Actor.sol",
+        "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol",
+        "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol",
+        "./governance/GovernorContract.sol"
       ],
       "versionPragmas": [
         "^0.8.0"
@@ -701,8 +708,8 @@
       ]
     },
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\governance\\Governor.sol": {
-      "lastModificationDate": 1674379973101,
-      "contentHash": "bbb046a0e771ab9863343dadde1072ae",
+      "lastModificationDate": 1675450694319,
+      "contentHash": "1871d971334d9ba8013131f7eac45ed7",
       "sourceName": "@openzeppelin/contracts/governance/Governor.sol",
       "solcConfig": {
         "version": "0.8.9",
@@ -969,8 +976,8 @@
       ]
     },
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\governance\\IGovernor.sol": {
-      "lastModificationDate": 1674379973157,
-      "contentHash": "bbba587a6884548b6d49b792337c7e9d",
+      "lastModificationDate": 1675481649552,
+      "contentHash": "aa3d10f11680fc75dfce9877264117db",
       "sourceName": "@openzeppelin/contracts/governance/IGovernor.sol",
       "solcConfig": {
         "version": "0.8.9",
@@ -1099,8 +1106,8 @@
       ]
     },
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\contracts\\governance\\GovernorContract.sol": {
-      "lastModificationDate": 1674968226581,
-      "contentHash": "6f01214525da514971b41d10feab6440",
+      "lastModificationDate": 1675484311985,
+      "contentHash": "96948f0e11b25192beca93715e182e0b",
       "sourceName": "contracts/governance/GovernorContract.sol",
       "solcConfig": {
         "version": "0.8.9",
@@ -1135,10 +1142,9 @@
       "imports": [
         "@openzeppelin/contracts/governance/Governor.sol",
         "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol",
-        "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol",
-        "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol",
         "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol",
-        "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol"
+        "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol",
+        "../Depto.sol"
       ],
       "versionPragmas": [
         "^0.8.9"
@@ -1148,8 +1154,8 @@
       ]
     },
     "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\governance\\extensions\\GovernorCountingSimple.sol": {
-      "lastModificationDate": 1674379973103,
-      "contentHash": "9d29fbf7536b618ba423373e26d690bc",
+      "lastModificationDate": 1675481648532,
+      "contentHash": "dd7972c1d6a4d8119d30c9613f27cc5f",
       "sourceName": "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol",
       "solcConfig": {
         "version": "0.8.9",
@@ -1642,10 +1648,10 @@
         "ERC20Votes"
       ]
     },
-    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\contracts\\DepToken.sol": {
-      "lastModificationDate": 1674380062533,
-      "contentHash": "da65bfe6b3ebe059122e8a5e401df968",
-      "sourceName": "contracts/DepToken.sol",
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\MarketAPI.sol": {
+      "lastModificationDate": 1674464384381,
+      "contentHash": "54f583437abadecc7184afce8420e6af",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol",
       "solcConfig": {
         "version": "0.8.9",
         "settings": {
@@ -1677,13 +1683,607 @@
         }
       },
       "imports": [
-        "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol"
+        "./types/MarketTypes.sol",
+        "./cbor/MarketCbor.sol",
+        "./types/CommonTypes.sol",
+        "./utils/Misc.sol",
+        "./utils/Actor.sol"
       ],
       "versionPragmas": [
-        "^0.8.9"
+        ">=0.4.25 <=0.8.17"
       ],
       "artifacts": [
-        "DepToken"
+        "MarketAPI"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\types\\CommonTypes.sol": {
+      "lastModificationDate": 1674464384371,
+      "contentHash": "017e1c673c6461fed6b0041586753c3e",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "../cbor/BigIntCbor.sol"
+      ],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "CommonTypes"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\utils\\Actor.sol": {
+      "lastModificationDate": 1675302134904,
+      "contentHash": "9c4053c49dd088fe502dc165cf092dd4",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/utils/Actor.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/utils/Strings.sol",
+        "./Misc.sol"
+      ],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "Actor"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\types\\MarketTypes.sol": {
+      "lastModificationDate": 1674464384384,
+      "contentHash": "0ed0f6d81dcea99f4206a58bf5cccd5b",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "../cbor/BigIntCbor.sol",
+        "./CommonTypes.sol"
+      ],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "MarketTypes"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\ERC721URIStorage.sol": {
+      "lastModificationDate": 1674379973096,
+      "contentHash": "8af32effd0536e2971ff8496812a5016",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "../ERC721.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "ERC721URIStorage"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\utils\\Misc.sol": {
+      "lastModificationDate": 1674464384389,
+      "contentHash": "e76093a742c75246a335a87339c822bf",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "Misc"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\cbor\\MarketCbor.sol": {
+      "lastModificationDate": 1674464384382,
+      "contentHash": "b7f8022af280766083407e4d7fedb38d",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "solidity-cborutils/contracts/CBOR.sol",
+        "../types/MarketTypes.sol",
+        "./BigIntCbor.sol",
+        "../utils/CborDecode.sol",
+        "../utils/Misc.sol"
+      ],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "AddressCBOR",
+        "DealIDCBOR",
+        "GetBalanceCBOR",
+        "GetDealActivationCBOR",
+        "GetDealClientCBOR",
+        "GetDealClientCollateralCBOR",
+        "GetDealDataCommitmentCBOR",
+        "GetDealEpochPriceCBOR",
+        "GetDealLabelCBOR",
+        "GetDealProviderCBOR",
+        "GetDealProviderCollateralCBOR",
+        "GetDealTermCBOR",
+        "GetDealVerifiedCBOR",
+        "PublishStorageDealsCBOR",
+        "WithdrawBalanceCBOR"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\cbor\\BigIntCbor.sol": {
+      "lastModificationDate": 1674464384368,
+      "contentHash": "2503399e07b63fe4c965fe25f1e8914e",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/cbor/BigIntCbor.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "BigIntCBOR"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\solidity-cborutils\\contracts\\CBOR.sol": {
+      "lastModificationDate": 1674023033781,
+      "contentHash": "f6fe9c5e14ab5496490b8d36007fdffd",
+      "sourceName": "solidity-cborutils/contracts/CBOR.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "@ensdomains/buffer/contracts/Buffer.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.4"
+      ],
+      "artifacts": [
+        "CBOR"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@zondax\\filecoin-solidity\\contracts\\v0.8\\utils\\CborDecode.sol": {
+      "lastModificationDate": 1674464384370,
+      "contentHash": "4d9b6d4cfc3eaba9560e0c2097485923",
+      "sourceName": "@zondax/filecoin-solidity/contracts/v0.8/utils/CborDecode.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.4.25 <=0.8.17"
+      ],
+      "artifacts": [
+        "CBORDecoder"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@ensdomains\\buffer\\contracts\\Buffer.sol": {
+      "lastModificationDate": 1674023036660,
+      "contentHash": "d3d00f20f206848f1e90d596ebcc557b",
+      "sourceName": "@ensdomains/buffer/contracts/Buffer.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.4"
+      ],
+      "artifacts": [
+        "Buffer"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\ERC721.sol": {
+      "lastModificationDate": 1674379973088,
+      "contentHash": "190f627b9302b9602d3a313e28205cc5",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/ERC721.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "./IERC721.sol",
+        "./IERC721Receiver.sol",
+        "./extensions/IERC721Metadata.sol",
+        "../../utils/Address.sol",
+        "../../utils/Context.sol",
+        "../../utils/Strings.sol",
+        "../../utils/introspection/ERC165.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "ERC721"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\IERC721.sol": {
+      "lastModificationDate": 1674379973144,
+      "contentHash": "eb7e61db29f31d88b3c1cef1b063d338",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/IERC721.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "../../utils/introspection/IERC165.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "IERC721"
+      ]
+    },
+    "C:\\Users\\Gabriel\\OneDrive\\Desktop\\depto\\blockend\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\IERC721Metadata.sol": {
+      "lastModificationDate": 1674379973148,
+      "contentHash": "efbc0d15b80a74e34dbe8da0f3e879bb",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol",
+      "solcConfig": {
+        "version": "0.8.9",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "devdoc",
+                "userdoc",
+                "storageLayout",
+                "evm.gasEstimates"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          },
+          "metadata": {
+            "useLiteralContent": true
+          }
+        }
+      },
+      "imports": [
+        "../IERC721.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "IERC721Metadata"
       ]
     }
   }

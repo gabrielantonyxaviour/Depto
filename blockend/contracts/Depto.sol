@@ -231,8 +231,8 @@ contract Depto is ERC721URIStorage, Ownable {
         view
         returns (PatentStorageDeal[] memory _patents)
     {
-        for (int i = 0; i < currentTokenId; i++) {
-            _patents.push(patents[bytes(tokenURI(i))]);
+        for (uint i = 0; i < currentTokenId; i++) {
+            _patents[i] = patents[bytes(tokenURI(i))];
         }
     }
 }
