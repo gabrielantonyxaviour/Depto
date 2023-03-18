@@ -1,238 +1,457 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import {MarketAPI} from "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
-import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
-import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
-import {Actor} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Actor.sol";
-import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "./governance/GovernorContract.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import {MarketAPI} from "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
+import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
+import {AccountTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/AccountTypes.sol";
+import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
+import {AccountCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/AccountCbor.sol";
+import {MarketCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol";
+import {BytesCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BytesCbor.sol";
+import {BigNumbers} from "@zondax/filecoin-solidity/contracts/v0.8/external/BigNumbers.sol";
+import {CBOR} from "@zondax/filecoin-solidity/contracts/v0.8/external/CBOR.sol";
+import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
+import {FilAddresses} from "@zondax/filecoin-solidity/contracts/v0.8/utils/FilAddresses.sol";
+import {MarketDealNotifyParams, deserializeMarketDealNotifyParams, serializeDealProposal, deserializeDealProposal} from "./Types.sol";
 
-/* 
-Contract Usage
-    Step   |   Who   |    What is happening  |   Why 
-    ------------------------------------------------
-    Deploy | contract owner   | contract owner deploys address is owner who can call addCID  | create contract setting up rules to follow
-    AddCID | data pinners     | set up cids that the contract will incentivize in deals      | add request for a deal in the filecoin network, "store data" function
-    Fund   | contract funders |  add FIL to the contract to later by paid out by deal        | ensure the deal actually gets stored by providing funds for bounty hunter and (indirect) storage provider
-    Claim  | bounty hunter    | claim the incentive to complete the cycle                    | pay back the bounty hunter for doing work for the contract
-*/
+using CBOR for CBOR.CBORBuffer;
+
+struct RequestId {
+    bytes32 requestId;
+    bool valid;
+}
+
+struct RequestIdx {
+    uint256 idx;
+    bool valid;
+}
+
+struct ProviderSet {
+    bytes provider;
+    bool valid;
+}
+
+// User request for this contract to make a deal. This structure is modelled after Filecoin's Deal
+// Proposal, but leaves out the provider, since any provider can pick up a deal broadcast by this
+// contract.
+struct DealRequest {
+    bytes piece_cid;
+    uint64 piece_size;
+    bool verified_deal;
+    string label;
+    int64 start_epoch;
+    int64 end_epoch;
+    uint256 storage_price_per_epoch;
+    uint256 provider_collateral;
+    uint256 client_collateral;
+    uint64 extra_params_version;
+    ExtraParamsV1 extra_params;
+}
+
+// Extra parameters associated with the deal request. These are off-protocol flags that
+// the storage provider will need.
+struct ExtraParamsV1 {
+    string location_ref;
+    uint64 car_size;
+    bool skip_ipni_announce;
+    bool remove_unsealed_copy;
+}
+
+function serializeExtraParamsV1(ExtraParamsV1 memory params)
+    pure
+    returns (bytes memory)
+{
+    CBOR.CBORBuffer memory buf = CBOR.create(64);
+    buf.startFixedArray(4);
+    buf.writeString(params.location_ref);
+    buf.writeUInt64(params.car_size);
+    buf.writeBool(params.skip_ipni_announce);
+    buf.writeBool(params.remove_unsealed_copy);
+    return buf.data();
+}
+
 contract Depto is ERC721URIStorage, Ownable {
-    struct PatentStorageDeal {
-        bytes cidraw;
-        uint size;
-        address proposer;
-        address patentClaimer;
-        bool set;
-        uint mintedAt;
+    using AccountCBOR for *;
+    using MarketCBOR for *;
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIdCounter;
+
+    uint64 public constant AUTHENTICATE_MESSAGE_METHOD_NUM = 2643134072;
+    uint64 public constant DATACAP_RECEIVER_HOOK_METHOD_NUM = 3726118371;
+    uint64 public constant MARKET_NOTIFY_DEAL_METHOD_NUM = 4186741094;
+    address public constant MARKET_ACTOR_ETH_ADDRESS =
+        address(0xff00000000000000000000000000000000000005);
+    address public constant DATACAP_ACTOR_ETH_ADDRESS =
+        address(0xfF00000000000000000000000000000000000007);
+
+    enum Status {
+        None,
+        RequestSubmitted,
+        DealPublished,
+        DealActivated,
+        DealTerminated
     }
-    mapping(bytes => PatentStorageDeal) public patents;
-    mapping(bytes => mapping(uint64 => bool)) public cidProviders;
+
+    mapping(bytes32 => RequestIdx) public dealRequestIdx; // contract deal id -> deal index
+    DealRequest[] public dealRequests;
+
+    mapping(bytes => RequestId) public pieceRequests; // commP -> dealProposalID
+    mapping(bytes => ProviderSet) public pieceProviders; // commP -> provider
+    mapping(bytes => uint64) public pieceDeals; // commP -> deal ID
+    mapping(bytes => Status) public pieceStatus;
+
     mapping(address => uint256) public rewards;
-    uint256 public currentApprovedPatentCount;
-    mapping(address => uint256) validationClaim;
 
-    uint public currentTokenId;
+    event ReceivedDataCap(string received);
+    event DealProposalCreate(
+        bytes32 indexed id,
+        uint64 size,
+        bool indexed verified,
+        uint256 price
+    );
+    address public deptoToken;
+    address public immutable i_creator;
 
-    address constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
-    uint64 constant DEFAULT_FLAG = 0x00000000;
-    uint64 constant METHOD_SEND = 0;
-
-    GovernorContract governorContract;
-
-    uint256 public constant VERIFIER_FEE = 215053763440000000;
-    uint256 public constant VALIDATOR_FEE = 4301075260000000;
-    uint256 public constant SP_FEE = 645161290320000000;
-    uint256 public constant GOVERNMENT_FEE = 667741935480000000;
-    uint256 public constant CREATOR_FEE = 300000000000000000;
-    uint256 public constant PROPOSAL_FEE = 2000000000000000000;
-    uint256 public constant FALSE_CLAIM_FEE = 1000000000000000000;
-
-    address public constant GOVERNMENT_ADDRESS =
-        0x5353448037eb0d940f209d47f31DbdDd66237A90;
-    address public constant DEPTO_CREATOR_ADDRESS =
-        0x5353448037eb0d940f209d47f31DbdDd66237A90;
-
-    constructor(address payable governorContractAddress)
-        ERC721("Depto", "DPT")
-    {
-        governorContract = GovernorContract(governorContractAddress);
-        currentApprovedPatentCount = 0;
+    constructor(IERC20 _deptoToken) ERC721("Depto", "DPT") {
+        deptoToken = _deptoToken;
+        creator = msg.sender;
     }
 
     receive() external payable {
-        rewards[DEPTO_CREATOR_ADDRESS] += msg.value;
+        rewards[i_creator] += msg.value;
     }
 
     fallback() external payable {
-        rewards[DEPTO_CREATOR_ADDRESS] += msg.value;
+        rewards[i_creator] += msg.value;
     }
 
-    function claimFeeRewards() public {
-        require(
-            governorContract.isDAOMember(msg.sender) ||
-                msg.sender == GOVERNMENT_ADDRESS ||
-                msg.sender == DEPTO_CREATOR_ADDRESS,
-            "Not authorized to claim rewards"
-        );
-        uint reward = 0;
-        bool success;
-        bytes memory data;
-        if (governorContract.isDAOMember(msg.sender)) {
-            if (currentApprovedPatentCount - validationClaim[msg.sender] > 0) {
-                reward +=
-                    VALIDATOR_FEE *
-                    (currentApprovedPatentCount - validationClaim[msg.sender]);
-                validationClaim[msg.sender] = currentApprovedPatentCount;
-            }
-        }
-        reward += rewards[msg.sender];
-        rewards[msg.sender] = 0;
-        require(reward > 0, "No rewards to claim");
-        (success, data) = payable(msg.sender).call{value: reward}("");
+    function getProviderSet(bytes calldata cid)
+        public
+        view
+        returns (ProviderSet memory)
+    {
+        return pieceProviders[cid];
     }
 
-    function addCID(
-        bytes calldata cidraw,
-        uint size,
+    function getProposalIdSet(bytes calldata cid)
+        public
+        view
+        returns (RequestId memory)
+    {
+        return pieceRequests[cid];
+    }
+
+    function dealsLength() public view returns (uint256) {
+        return dealRequests.length;
+    }
+
+    function getDealByIndex(uint256 index)
+        public
+        view
+        returns (DealRequest memory)
+    {
+        return dealRequests[index];
+    }
+
+    function makeDealProposal(
+        DealRequest calldata deal,
         address verifier,
-        address patentClaimer
-    ) public payable onlyOwner returns (bool) {
-        require(msg.value >= PROPOSAL_FEE, "Invalid");
-        patents[cidraw] = PatentStorageDeal(
-            cidraw,
-            size,
-            verifier,
-            patentClaimer,
-            false,
-            0
+        address claimer
+    ) public payable onlyOwner returns (bytes32) {
+        if (
+            pieceStatus[deal.piece_cid] == Status.DealPublished ||
+            pieceStatus[deal.piece_cid] == Status.DealActivated
+        ) {
+            revert("deal with this pieceCid already published");
+        }
+
+        uint256 index = dealRequests.length;
+        dealRequests.push(deal);
+
+        // creates a unique ID for the deal proposal -- there are many ways to do this
+        bytes32 id = keccak256(
+            abi.encodePacked(block.timestamp, msg.sender, index)
+        );
+        dealRequestIdx[id] = RequestIdx(index, true);
+
+        pieceRequests[deal.piece_cid] = RequestId(id, true);
+        pieceStatus[deal.piece_cid] = Status.RequestSubmitted;
+        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter.increment();
+        _mint(claimer, tokenId);
+        _setTokenURI(currentTokenId, deal.piece_cid);
+        rewards[verifier] = msg.value;
+
+        // writes the proposal metadata to the event log
+        emit DealProposalCreate(
+            id,
+            deal.piece_size,
+            deal.verified_deal,
+            deal.storage_price_per_epoch
         );
 
-        return true;
+        return id;
     }
 
-    function falseClaimResolver(
-        uint falseTokenId,
-        uint appliedTokenId,
-        address claimerAddress,
-        address falseClaimVerifier
-    ) public payable onlyOwner {
-        require(
-            msg.value >= FALSE_CLAIM_FEE,
-            "Not enough fees to resolve claim"
-        );
-        _requireMinted(falseTokenId);
-        _burn(falseTokenId);
-        rewards[GOVERNMENT_ADDRESS] = msg.value / 2;
-        rewards[DEPTO_CREATOR_ADDRESS] = msg.value / 4;
-        rewards[falseClaimVerifier] = msg.value / 4;
-    }
-
-    function policyOK(bytes memory cidraw, uint64 provider)
+    // helper function to get deal request based from id
+    function getDealRequest(bytes32 requestId)
         internal
         view
-        returns (bool)
+        returns (DealRequest memory)
     {
-        bool alreadyStoring = cidProviders[cidraw][provider];
-        return !alreadyStoring;
+        RequestIdx memory ri = dealRequestIdx[requestId];
+        require(ri.valid, "proposalId not available");
+        return dealRequests[ri.idx];
     }
 
-    function authorizeData(
-        bytes memory cidraw,
-        uint64 provider,
-        uint size
-    ) internal {
-        require(patents[cidraw].set, "cid must be added before authorizing");
-        require(patents[cidraw].size == size, "data size must match expected");
+    // Returns a CBOR-encoded DealProposal.
+    function getDealProposal(bytes32 proposalId)
+        public
+        view
+        returns (bytes memory)
+    {
+        DealRequest memory deal = getDealRequest(proposalId);
+
+        MarketTypes.DealProposal memory ret;
+        ret.piece_cid = CommonTypes.Cid(deal.piece_cid);
+        ret.piece_size = deal.piece_size;
+        ret.verified_deal = deal.verified_deal;
+        ret.client = getDelegatedAddress(address(this));
+        // Set a dummy provider. The provider that picks up this deal will need to set its own address.
+        ret.provider = FilAddresses.fromActorID(0);
+        ret.label = deal.label;
+        ret.start_epoch = deal.start_epoch;
+        ret.end_epoch = deal.end_epoch;
+        ret.storage_price_per_epoch = uintToBigInt(
+            deal.storage_price_per_epoch
+        );
+        ret.provider_collateral = uintToBigInt(deal.provider_collateral);
+        ret.client_collateral = uintToBigInt(deal.client_collateral);
+
+        return serializeDealProposal(ret);
+    }
+
+    // TODO fix in filecoin-solidity. They're using the wrong hex value.
+    function getDelegatedAddress(address addr)
+        internal
+        pure
+        returns (CommonTypes.FilAddress memory)
+    {
+        return CommonTypes.FilAddress(abi.encodePacked(hex"040a", addr));
+    }
+
+    function getExtraParams(bytes32 proposalId)
+        public
+        view
+        returns (bytes memory extra_params)
+    {
+        DealRequest memory deal = getDealRequest(proposalId);
+        return serializeExtraParamsV1(deal.extra_params);
+    }
+
+    // authenticateMessage is the callback from the market actor into the contract
+    // as part of PublishStorageDeals. This message holds the deal proposal from the
+    // miner, which needs to be validated by the contract in accordance with the
+    // deal requests made and the contract's own policies
+    // @params - cbor byte array of AccountTypes.AuthenticateMessageParams
+    function authenticateMessage(bytes memory params) internal view {
         require(
-            policyOK(cidraw, provider),
-            "deal failed policy check: has provider already claimed this cid?"
+            msg.sender == MARKET_ACTOR_ETH_ADDRESS,
+            "msg.sender needs to be market actor f05"
         );
 
-        cidProviders[cidraw][provider] = true;
-    }
-
-    function claim_bounty(uint64 deal_id) public {
-        MarketTypes.GetDealDataCommitmentReturn memory commitmentRet = MarketAPI
-            .getDealDataCommitment(deal_id);
-        MarketTypes.GetDealProviderReturn memory providerRet = MarketAPI
-            .getDealProvider(deal_id);
-
-        authorizeData(
-            commitmentRet.data,
-            providerRet.provider,
-            commitmentRet.size
+        AccountTypes.AuthenticateMessageParams memory amp = params
+            .deserializeAuthenticateMessageParams();
+        MarketTypes.DealProposal memory proposal = deserializeDealProposal(
+            amp.message
         );
 
-        // get dealer (bounty hunter client)
-        MarketTypes.GetDealClientReturn memory clientRet = MarketAPI
-            .getDealClient(deal_id);
-        patents[commitmentRet.data].set = true;
-        patents[commitmentRet.data].mintedAt = block.timestamp;
-        // send reward to client
-        send(clientRet.client);
+        bytes memory pieceCid = proposal.piece_cid.data;
+        require(
+            pieceRequests[pieceCid].valid,
+            "piece cid must be added before authorizing"
+        );
+        require(
+            !pieceProviders[pieceCid].valid,
+            "deal failed policy check: provider already claimed this cid"
+        );
 
-        // change state from waiting for SP to Success
-
-        // allot money to everyone
-        rewards[GOVERNMENT_ADDRESS] += GOVERNMENT_FEE;
-        rewards[patents[commitmentRet.data].proposer] += VERIFIER_FEE;
-        rewards[DEPTO_CREATOR_ADDRESS] += CREATOR_FEE;
-        currentApprovedPatentCount += 1;
-
-        //mint patent NFT to patent applicant
-        _mint(patents[commitmentRet.data].patentClaimer, currentTokenId);
-        _setTokenURI(currentTokenId, string(commitmentRet.data));
+        DealRequest memory req = getDealRequest(
+            pieceRequests[pieceCid].requestId
+        );
+        require(
+            proposal.verified_deal == req.verified_deal,
+            "verified_deal param mismatch"
+        );
+        require(
+            bigIntToUint(proposal.storage_price_per_epoch) <=
+                req.storage_price_per_epoch,
+            "storage price greater than request amount"
+        );
+        require(
+            bigIntToUint(proposal.client_collateral) <= req.client_collateral,
+            "client collateral greater than request amount"
+        );
     }
 
-    function call_actor_id(
+    // dealNotify is the callback from the market actor into the contract at the end
+    // of PublishStorageDeals. This message holds the previously approved deal proposal
+    // and the associated dealID. The dealID is stored as part of the contract state
+    // and the completion of this call marks the success of PublishStorageDeals
+    // @params - cbor byte array of MarketDealNotifyParams
+    function dealNotify(bytes memory params) internal {
+        require(
+            msg.sender == MARKET_ACTOR_ETH_ADDRESS,
+            "msg.sender needs to be market actor f05"
+        );
+
+        MarketDealNotifyParams memory mdnp = deserializeMarketDealNotifyParams(
+            params
+        );
+        MarketTypes.DealProposal memory proposal = deserializeDealProposal(
+            mdnp.dealProposal
+        );
+
+        // These checks prevent race conditions between the authenticateMessage and
+        // marketDealNotify calls where someone could have 2 of the same deal proposals
+        // within the same PSD msg, which would then get validated by authenticateMessage
+        // However, only one of those deals should be allowed
+        require(
+            pieceRequests[proposal.piece_cid.data].valid,
+            "piece cid must be added before authorizing"
+        );
+        require(
+            !pieceProviders[proposal.piece_cid.data].valid,
+            "deal failed policy check: provider already claimed this cid"
+        );
+
+        pieceProviders[proposal.piece_cid.data] = ProviderSet(
+            proposal.provider.data,
+            true
+        );
+        pieceDeals[proposal.piece_cid.data] = mdnp.dealId;
+        pieceStatus[proposal.piece_cid.data] = Status.DealPublished;
+    }
+
+    // This function can be called/smartly polled to retrieve the deal activation status
+    // associated with provided pieceCid and update the contract state based on that
+    // info
+    // @pieceCid - byte representation of pieceCid
+    function updateActivationStatus(bytes memory pieceCid) public {
+        require(
+            pieceDeals[pieceCid] > 0,
+            "no deal published for this piece cid"
+        );
+
+        MarketTypes.GetDealActivationReturn memory ret = MarketAPI
+            .getDealActivation(pieceDeals[pieceCid]);
+        if (ret.terminated > 0) {
+            pieceStatus[pieceCid] = Status.DealTerminated;
+        } else if (ret.activated > 0) {
+            pieceStatus[pieceCid] = Status.DealActivated;
+        }
+    }
+
+    // addBalance funds the builtin storage market actor's escrow
+    // with funds from the contract's own balance
+    // @value - amount to be added in escrow in attoFIL
+    function addBalance(uint256 value) public onlyOwner {
+        MarketAPI.addBalance(getDelegatedAddress(address(this)), value);
+    }
+
+    // TODO: Below 2 funcs need to go to filecoin.sol
+    function uintToBigInt(uint256 value)
+        internal
+        view
+        returns (CommonTypes.BigInt memory)
+    {
+        BigNumbers.BigNumber memory bigNumVal = BigNumbers.init(value, false);
+        CommonTypes.BigInt memory bigIntVal = CommonTypes.BigInt(
+            bigNumVal.val,
+            bigNumVal.neg
+        );
+        return bigIntVal;
+    }
+
+    function bigIntToUint(CommonTypes.BigInt memory bigInt)
+        internal
+        view
+        returns (uint256)
+    {
+        BigNumbers.BigNumber memory bigNumUint = BigNumbers.init(
+            bigInt.val,
+            bigInt.neg
+        );
+        uint256 bigNumExtractedUint = uint256(bytes32(bigNumUint.val));
+        return bigNumExtractedUint;
+    }
+
+    // This function attempts to withdraw the specified amount from the contract addr's escrow balance
+    // If less than the given amount is available, the full escrow balance is withdrawn
+    // @client - Eth address where the balance is withdrawn to. This can be the contract address or an external address
+    // @value - amount to be withdrawn in escrow in attoFIL
+    function withdrawBalance(address client, uint256 value)
+        public
+        onlyOwner
+        returns (uint)
+    {
+        MarketTypes.WithdrawBalanceParams memory params = MarketTypes
+            .WithdrawBalanceParams(
+                getDelegatedAddress(client),
+                uintToBigInt(value)
+            );
+        CommonTypes.BigInt memory ret = MarketAPI.withdrawBalance(params);
+
+        return bigIntToUint(ret);
+    }
+
+    function receiveDataCap(bytes memory params) internal {
+        require(
+            msg.sender == DATACAP_ACTOR_ETH_ADDRESS,
+            "msg.sender needs to be datacap actor f07"
+        );
+        emit ReceivedDataCap("DataCap Received!");
+        // Add get datacap balance api and store datacap amount
+    }
+
+    // handle_filecoin_method is the universal entry point for any evm based
+    // actor for a call coming from a builtin filecoin actor
+    // @method - FRC42 method number for the specific method hook
+    // @params - CBOR encoded byte array params
+    function handle_filecoin_method(
         uint64 method,
-        uint256 value,
-        uint64 flags,
-        uint64 codec,
-        bytes memory params,
-        uint64 id
+        uint64,
+        bytes memory params
     )
         public
         returns (
-            bool,
-            int256,
+            uint32,
             uint64,
             bytes memory
         )
     {
-        (bool success, bytes memory data) = address(CALL_ACTOR_ID).delegatecall(
-            abi.encode(method, value, flags, codec, params, id)
-        );
-        (int256 exit, uint64 return_codec, bytes memory return_value) = abi
-            .decode(data, (int256, uint64, bytes));
-        return (success, exit, return_codec, return_value);
-    }
-
-    // send 1 FIL to the filecoin actor at actor_id
-    function send(uint64 actorID) internal {
-        bytes memory emptyParams = "";
-        delete emptyParams;
-
-        call_actor_id(
-            METHOD_SEND,
-            SP_FEE,
-            DEFAULT_FLAG,
-            Misc.NONE_CODEC,
-            emptyParams,
-            actorID
-        );
-    }
-
-    function getAllPatents()
-        public
-        view
-        returns (PatentStorageDeal[] memory _patents)
-    {
-        for (uint i = 0; i < currentTokenId; i++) {
-            _patents[i] = patents[bytes(tokenURI(i))];
+        bytes memory ret;
+        uint64 codec;
+        // dispatch methods
+        if (method == AUTHENTICATE_MESSAGE_METHOD_NUM) {
+            authenticateMessage(params);
+            // If we haven't reverted, we should return a CBOR true to indicate that verification passed.
+            CBOR.CBORBuffer memory buf = CBOR.create(1);
+            buf.writeBool(true);
+            ret = buf.data();
+            codec = Misc.CBOR_CODEC;
+        } else if (method == MARKET_NOTIFY_DEAL_METHOD_NUM) {
+            dealNotify(params);
+        } else if (method == DATACAP_RECEIVER_HOOK_METHOD_NUM) {
+            receiveDataCap(params);
+        } else {
+            revert("the filecoin method that was called is not handled");
         }
+        return (0, codec, ret);
     }
 }
