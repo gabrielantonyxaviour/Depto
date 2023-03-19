@@ -2149,8 +2149,8 @@
       ]
     },
     "E:\\projects\\depto_contracts\\contracts\\governance\\GovernorContract.sol": {
-      "lastModificationDate": 1679214334673,
-      "contentHash": "f12c3f640f0ec47ac3aae00afeb611cf",
+      "lastModificationDate": 1679246049879,
+      "contentHash": "399e3198ac123fd21c0bef9d40aff57e",
       "sourceName": "contracts/governance/GovernorContract.sol",
       "solcConfig": {
         "version": "0.8.17",

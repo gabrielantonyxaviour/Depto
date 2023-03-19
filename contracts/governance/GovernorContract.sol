@@ -28,6 +28,9 @@ contract GovernorContract is
     mapping(uint => Application) applications;
     uint public applicationsPointer;
 
+    mapping(uint => uint) proposalsToProposalId;
+    uint public proposalsPointer;
+
     mapping(address => mapping(uint => bool)) public verifierToApplication;
     mapping(address => mapping(uint => bool)) public claimerToClaims;
 
@@ -56,7 +59,11 @@ contract GovernorContract is
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(_quorumPercentage)
         GovernorTimelockControl(_timelock)
-    {}
+    {
+        proposalsPointer = 0;
+        applicationsPointer = 0;
+        treasury = 0;
+    }
 
     function applyPatent(string calldata metadataURI) public payable {
         require(msg.value >= APPLICATION_FEE, "Insufficient Fee");
@@ -117,13 +124,31 @@ contract GovernorContract is
         return super.state(proposalId);
     }
 
+    function getProposals()
+        public
+        view
+        returns (ProposalState[] memory _allProposals)
+    {
+        for (uint i = 0; i < proposalsPointer; i++) {
+            _allProposals[i] = state(proposalsToProposalId[proposalsPointer]);
+        }
+    }
+
     function propose(
         address[] memory targets,
         uint256[] memory values,
         bytes[] memory calldatas,
         string memory description
     ) public override(Governor, IGovernor) returns (uint256) {
-        return super.propose(targets, values, calldatas, description);
+        uint _proposalId = super.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+        proposalsToProposalId[proposalsPointer] = _proposalId;
+        proposalsPointer += 1;
+        return _proposalId;
     }
 
     function proposalThreshold()
