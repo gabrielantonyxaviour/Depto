@@ -114,12 +114,19 @@ contract Depto is ERC721URIStorage, Ownable {
         bool indexed verified,
         uint256 price
     );
+    event PatentCreated(
+        bytes indexed piececid,
+        uint indexed tokenId,
+        address owner,
+        address verifier
+    );
+    event RewardsClaimed(address claimer, uint amount);
     address public deptoToken;
     address public immutable i_creator;
 
-    constructor(IERC20 _deptoToken) ERC721("Depto", "DPT") {
+    constructor(address _deptoToken) ERC721("Depto", "DPT") {
         deptoToken = _deptoToken;
-        creator = msg.sender;
+        i_creator = msg.sender;
     }
 
     receive() external payable {
@@ -158,6 +165,17 @@ contract Depto is ERC721URIStorage, Ownable {
         return dealRequests[index];
     }
 
+    function claimFeeRewards() public {
+        require(IERC20(deptoToken).balanceOf(msg.sender) > 0, "Unauthorzied");
+        require(rewards[msg.sender] > 0, "No rewards");
+        uint reward = rewards[msg.sender];
+        rewards[msg.sender] = 0;
+        (bool success, bytes memory ret) = payable(msg.sender).call{
+            value: reward
+        }("");
+        emit RewardsClaimed(msg.sender, reward);
+    }
+
     function makeDealProposal(
         DealRequest calldata deal,
         address verifier,
@@ -184,7 +202,7 @@ contract Depto is ERC721URIStorage, Ownable {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _mint(claimer, tokenId);
-        _setTokenURI(currentTokenId, deal.piece_cid);
+        _setTokenURI(tokenId, string(deal.piece_cid));
         rewards[verifier] = msg.value;
 
         // writes the proposal metadata to the event log
@@ -194,6 +212,7 @@ contract Depto is ERC721URIStorage, Ownable {
             deal.verified_deal,
             deal.storage_price_per_epoch
         );
+        emit PatentCreated(deal.piece_cid, tokenId, claimer, verifier);
 
         return id;
     }

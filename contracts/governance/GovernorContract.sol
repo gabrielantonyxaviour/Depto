@@ -128,11 +128,11 @@ contract GovernorContract is
 
     function proposalThreshold()
         public
-        view
+        pure
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return super.proposalThreshold();
+        return uint256(5);
     }
 
     function _execute(
