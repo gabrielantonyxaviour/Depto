@@ -5,17 +5,17 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import {MarketAPI} from "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
-import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
-import {AccountTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/AccountTypes.sol";
-import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
-import {AccountCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/AccountCbor.sol";
-import {MarketCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol";
-import {BytesCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BytesCbor.sol";
-import {BigNumbers} from "@zondax/filecoin-solidity/contracts/v0.8/external/BigNumbers.sol";
-import {CBOR} from "@zondax/filecoin-solidity/contracts/v0.8/external/CBOR.sol";
-import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
-import {FilAddresses} from "@zondax/filecoin-solidity/contracts/v0.8/utils/FilAddresses.sol";
+import {MarketAPI} from "./zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
+import {MarketTypes} from "./zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
+import {AccountTypes} from "./zondax/filecoin-solidity/contracts/v0.8/types/AccountTypes.sol";
+import {CommonTypes} from "./zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
+import {AccountCBOR} from "./zondax/filecoin-solidity/contracts/v0.8/cbor/AccountCbor.sol";
+import {MarketCBOR} from "./zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol";
+import {BytesCBOR} from "./zondax/filecoin-solidity/contracts/v0.8/cbor/BytesCbor.sol";
+// import {BigNumbers} from "./zondax/filecoin-solidity/contracts/v0.8/external/BigNumbers.sol";
+import {CBOR} from "./zondax/filecoin-solidity/contracts/v0.8/external/CBOR.sol";
+import {Misc} from "./zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
+import {FilAddresses} from "./zondax/filecoin-solidity/contracts/v0.8/utils/FilAddresses.sol";
 import {MarketDealNotifyParams, deserializeMarketDealNotifyParams, serializeDealProposal, deserializeDealProposal} from "./Types.sol";
 
 using CBOR for CBOR.CBORBuffer;
@@ -389,10 +389,9 @@ contract Depto is ERC721URIStorage, Ownable {
         view
         returns (CommonTypes.BigInt memory)
     {
-        BigNumbers.BigNumber memory bigNumVal = BigNumbers.init(value, false);
         CommonTypes.BigInt memory bigIntVal = CommonTypes.BigInt(
-            bigNumVal.val,
-            bigNumVal.neg
+            abi.encodePacked(value),
+            false
         );
         return bigIntVal;
     }
@@ -402,11 +401,7 @@ contract Depto is ERC721URIStorage, Ownable {
         view
         returns (uint256)
     {
-        BigNumbers.BigNumber memory bigNumUint = BigNumbers.init(
-            bigInt.val,
-            bigInt.neg
-        );
-        uint256 bigNumExtractedUint = uint256(bytes32(bigNumUint.val));
+        uint256 bigNumExtractedUint = uint256(bytes32(bigInt.val));
         return bigNumExtractedUint;
     }
 
